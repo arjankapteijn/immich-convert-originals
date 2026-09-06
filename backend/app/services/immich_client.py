@@ -47,6 +47,7 @@ class ImmichClient:
         retry_max: int = 3,
         retry_backoff: int = 2,
         timeout: tuple[int, int] = (10, 300),
+        upload_timeout: tuple[int, int] = (60, 300),
     ):
         self.api_base = api_base
         self.api_key = api_key
@@ -54,6 +55,13 @@ class ImmichClient:
         self.retry_backoff = retry_backoff
         self._default_headers = {"x-api-key": api_key}
         self._timeout = timeout  # (connect_timeout, read_timeout)
+        # Uploads stream the full converted file as the request body, so the
+        # connect-phase timeout also has to cover however long sending that
+        # body takes (requests/urllib3 keep the connect-timeout socket
+        # deadline in effect until the request has been fully sent, not just
+        # until the TCP handshake completes) -- a large file can easily take
+        # longer than the short timeout used for regular API calls.
+        self._upload_timeout = upload_timeout
 
     def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
         last_error = None
@@ -301,7 +309,7 @@ class ImmichClient:
                         headers=self._default_headers,
                         files=files,
                         data=data,
-                        timeout=self._timeout,
+                        timeout=self._upload_timeout,
                     )
 
                     if response.status_code == 401:
