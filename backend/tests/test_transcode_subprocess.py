@@ -558,8 +558,6 @@ class TestTranscodeVideo:
         assert vf_value.endswith(",setparams=colorspace=bt709")
 
     def test_gbr_hdr_source_is_not_remapped(self, tmp_path):
-        # HDR branch sets its own explicit -colorspace, so the SDR-only
-        # identity-matrix workaround must not also fire here.
         input_path = tmp_path / "input.mp4"
         input_path.write_bytes(b"\x00" * 100)
         output_path = tmp_path / "output.mp4"

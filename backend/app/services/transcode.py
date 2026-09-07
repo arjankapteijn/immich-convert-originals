@@ -165,10 +165,8 @@ def detect_hdr_transfer(path: str, timeouts: Timeouts = DEFAULT_TIMEOUTS) -> str
         return None
 
 
-# ffprobe color_space values that require 4:4:4 chroma in SVT-AV1.
-# Older phone/WhatsApp encoders commonly mistag ordinary 4:2:0 SDR streams
-# this way (matrix_coefficients=0, "Identity"), rather than encoding genuine
-# RGB/4:4:4 content -- SVT-AV1 rejects the mismatch outright.
+# ffprobe color_space values SVT-AV1 rejects outside 4:4:4 chroma.
+# Ordinary SDR mistagged gbr/rgb (matrix_coefficients=0, "Identity").
 IDENTITY_MATRIX_COLOR_SPACES = {"gbr", "rgb"}
 
 
@@ -482,11 +480,8 @@ def transcode_video(
     matching transfer characteristics carried through to the AV1 stream,
     instead of being flattened to 8-bit SDR. Everything else is unaffected.
 
-    SDR sources mistagged gbr/rgb (matrix_coefficients=0, "Identity" --
-    common on older phone/WhatsApp exports) have their color metadata
-    relabeled to bt709 before encoding, since SVT-AV1 otherwise refuses to
-    encode that tag outside 4:4:4 chroma even though the actual pixel data
-    is ordinary 4:2:0.
+    SDR sources mistagged gbr/rgb (matrix_coefficients=0, "Identity") are
+    relabeled to bt709, which SVT-AV1 accepts outside 4:4:4 chroma.
 
     Args:
         crf: Quality (0-63, lower=better)
@@ -548,12 +543,8 @@ def transcode_video(
             f"'trunc(if(gt(min(iw,ih),{max_dimension}),ih*{max_dimension}/min(iw,ih),ih)/2)*2'"
         )
 
-    # Older phone/WhatsApp encoders commonly mistag ordinary 4:2:0 SDR streams
-    # as gbr/rgb (matrix_coefficients=0, "Identity"). SVT-AV1 refuses to
-    # encode that combination outside 4:4:4, so relabel (not convert) the
-    # frame metadata to a standard matrix before it reaches the encoder.
-    # The HDR branch below already sets its own explicit -colorspace, so this
-    # only matters for the SDR path.
+    # Mistagged gbr/rgb SDR: relabel metadata to bt709 (HDR sets its own
+    # -colorspace below).
     if not hdr_transfer and color_space in IDENTITY_MATRIX_COLOR_SPACES:
         filters.append("setparams=colorspace=bt709")
 
