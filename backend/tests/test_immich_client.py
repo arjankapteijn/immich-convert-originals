@@ -370,11 +370,6 @@ class TestUploadAsset:
         assert error is None
 
     def test_uses_upload_timeout_not_default_timeout(self, tmp_path):
-        # Uploads stream the whole converted file as the request body, so a
-        # large file can take much longer to send than the short
-        # connect-timeout used for regular (bodyless/small) API calls would
-        # allow -- upload_asset must use the separate, more generous
-        # upload_timeout instead of the client's general-purpose timeout.
         client = ImmichClient(
             api_base="https://example.com/api/",
             api_key="test_key",
