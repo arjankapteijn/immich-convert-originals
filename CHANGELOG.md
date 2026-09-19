@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.4.2] - 2026-09-19
+
+Reports the package version in the OpenAPI schema and tidies the lint tooling.
+
+### Fixes
+
+- Report the package version in the OpenAPI schema instead of the framework default
+
+### CI
+
+- Install lint tools from `requirements-dev.txt` and pin the ruff rule set
+- Update the pinned lint tools to their latest versions
+
+### Documentation
+
+- Add a troubleshooting section to the README
+
+### Documentation & Links
+
+- [README](https://github.com/fabianwimberger/immich-convert-originals#readme)
+- [Container image](https://github.com/fabianwimberger/immich-convert-originals/pkgs/container/immich-convert-originals)
+
 ## [v2.4.1] - 2026-09-11
 
 Fixes a large-upload timeout bug and an AV1 transcode failure on certain SDR sources.
