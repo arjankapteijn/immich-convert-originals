@@ -149,6 +149,15 @@ Everything behavioral — Immich connection, encoding defaults, filters, output 
 
 **USE AT YOUR OWN RISK.** In upload mode this tool deletes originals after conversion (recoverable via Immich trash for 30 days) — always back up first and test on a small selection before converting a whole library. The web UI has no built-in authentication — it's intended for a trusted home network or behind your own reverse-proxy auth; don't expose it directly to the internet.
 
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---------|-------------|
+| Connection test fails with a 404 | The Immich URL must point at the API root and include the `/api` suffix, e.g. `http://immich:2283/api` or `https://photos.example.com/api`. |
+| Connection test or uploads fail with 401/403 | The API key is missing a needed scope. Create it with asset read **and** asset upload permissions in Immich → Account Settings → API Keys; a read-only key authenticates but fails on upload. |
+| `Permission denied` writing to `/app/data` | The container runs as uid 1000, but a bind-mount source created by Docker is root-owned. Create the host `data/` directory yourself before the first run (`mkdir -p data`). |
+| Transcode fails with a codec or delegate error | Local runs need `ffmpeg`, ImageMagick with the JXL/HEIC/AVIF delegates, `libjxl-tools`, and `exiftool` on the host. Use the Docker image to avoid host codec gaps. |
+
 ## Docker Image Tags
 
 Images are available from `ghcr.io/fabianwimberger/immich-convert-originals`. Use `main` for latest, or pin to a release tag (`v2`, `v2.0`, `v2.0.0`).

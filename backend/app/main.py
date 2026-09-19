@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app import __version__
 from app.config import settings
 
 logging.basicConfig(
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Immich Library Converter",
     description="Web UI for batch-transcoding an Immich library to JPEG XL and AV1",
-    version="2.0.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
