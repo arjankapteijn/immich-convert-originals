@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "immich-convert-originals"
-version = "2.4.0"
+version = "2.4.2"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
@@ -22,9 +22,9 @@ dev = [
     "pytest-cov>=7.0.0",
     "httpx>=0.28.1",
     "responses>=0.26.3",
-    "ruff>=0.16.5",
+    "ruff>=0.16.7",
     "mypy>=2.3.1",
-    "types-requests>=2.33.0.20260712",
+    "types-requests>=2.33.0.20260906",
 ]
 
 [tool.pytest.ini_options]
@@ -51,6 +51,11 @@ skip_covered = false
 [tool.ruff]
 target-version = "py313"
 include = ["backend/app/**/*.py", "backend/tests/**/*.py"]
+
+[tool.ruff.lint]
+# Pin the rule set explicitly: ruff 0.16 widened its defaults, which this
+# codebase has not been migrated to.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.mypy]
 python_version = "3.13"
