@@ -141,6 +141,74 @@ class TestCreateRun:
             assert cfg["asset_ids"] == ["a1", "a2"]
 
 
+class TestRunTimestampsAreUtcAware:
+    """Regression test for the offset-less UTC timestamp bug.
+
+    Run.created_at is always written as datetime.now(timezone.utc), but a
+    plain DateTime column drops the tzinfo on read on SQLite -- so without
+    the TZDateTime column type (app/models/types.py), the API returns e.g.
+    "2026-09-23T22:00:01" instead of "...+00:00". A browser's
+    `new Date(...)` treats the former as local time instead of converting
+    it, making a run that started at local midnight (CEST, UTC+2) display
+    as if it started at 22:00.
+
+    datetime.fromisoformat() round-trips exactly what a browser's Date
+    parser cares about: whether an offset is present at all. tzinfo is
+    None for the old, broken shape (plain DateTime column) and
+    datetime.timezone.utc for the fixed one (TZDateTime), so asserting
+    `parsed.tzinfo is not None` fails on the old column type and passes
+    on the new one. See test_types.py for unit tests of TZDateTime
+    itself; these exercise it through the real API round-trip.
+    """
+
+    async def test_created_at_round_trips_through_sqlite_with_a_utc_offset(
+        self, client
+    ):
+        from datetime import datetime
+
+        await _configure_connection(client)
+        resp = await client.post(
+            "/api/runs", json={"asset_types": "IMAGE", "dry_run": True}
+        )
+        data = resp.json()
+
+        parsed = datetime.fromisoformat(data["created_at"])
+        assert parsed.tzinfo is not None, (
+            f"created_at={data['created_at']!r} has no UTC offset -- a "
+            "browser's `new Date(...)` will misread this as local time"
+        )
+        assert parsed.utcoffset().total_seconds() == 0
+
+    async def test_asset_outcome_updated_at_has_a_utc_offset(self, client):
+        from datetime import datetime
+
+        await _configure_connection(client)
+        run_resp = await client.post(
+            "/api/runs", json={"asset_ids": ["a1"], "dry_run": False}
+        )
+        run_id = run_resp.json()["id"]
+
+        async with AsyncSessionLocal() as db:
+            outcome = AssetOutcome(
+                run_id=run_id,
+                asset_id="a1",
+                filename="a1.jpg",
+                status="success",
+            )
+            db.add(outcome)
+            await db.commit()
+
+        resp = await client.get(f"/api/runs/{run_id}/assets")
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+
+        parsed = datetime.fromisoformat(items[0]["updated_at"])
+        assert parsed.tzinfo is not None, (
+            f"updated_at={items[0]['updated_at']!r} has no UTC offset"
+        )
+
+
 class TestListAndGetRuns:
     async def test_list_and_get(self, client):
         await _configure_connection(client)
@@ -337,6 +405,34 @@ class TestExportFailures:
         assert "b.jpg" in body
         assert "boom" in body
         assert "a1" not in body
+
+    async def test_updated_at_column_has_a_utc_offset(self, client):
+        """CSV export reads AssetOutcome.updated_at straight off the ORM
+        object (not through AssetOutcomeResponse) -- it only gets a UTC
+        offset because TZDateTime makes that true at the column itself,
+        for every reader, not because this route was patched directly."""
+        await _configure_connection(client)
+        created = await client.post("/api/runs", json={"asset_types": "IMAGE"})
+        run_id = created.json()["id"]
+
+        async with AsyncSessionLocal() as db:
+            db.add(
+                AssetOutcome(
+                    run_id=run_id,
+                    asset_id="a2",
+                    filename="b.jpg",
+                    status="failed_upload",
+                    error="boom",
+                )
+            )
+            await db.commit()
+
+        resp = await client.get(f"/api/runs/{run_id}/export-failures")
+        body = resp.text
+        updated_at_field = body.strip().splitlines()[-1].split(",")[-1]
+        assert "+00:00" in updated_at_field, (
+            f"CSV updated_at={updated_at_field!r} has no UTC offset"
+        )
 
     async def test_missing_run_404(self, client):
         resp = await client.get("/api/runs/999999/export-failures")

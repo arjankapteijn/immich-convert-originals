@@ -1,28 +1,12 @@
 """Pydantic schemas for API requests and responses."""
 
-from datetime import datetime, timezone
-from typing import Annotated
+from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.asset_outcome import AssetOutcome as AssetOutcomeRow
 from app.models.run import Run as RunRow
 from app.models.settings import Settings as SettingsRow
-
-# The ORM columns behind these fields are always written with
-# datetime.now(timezone.utc), but SQLite/SQLAlchemy drops the tzinfo on
-# read, so the value we get here is UTC without saying so. Serializing it
-# as-is produces an offset-less ISO string (e.g. "2026-09-23T22:00:01"),
-# which browsers parse as local time instead of converting it -- the run
-# then appears to have started two hours earlier than it actually did.
-# Stamp the UTC offset back on before it leaves the API.
-UtcDatetime = Annotated[
-    datetime,
-    PlainSerializer(
-        lambda dt: (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat(),
-        return_type=str,
-    ),
-]
 
 
 class SettingsResponse(BaseModel):
@@ -210,9 +194,9 @@ class RunResponse(BaseModel):
 
     id: int
     status: str
-    created_at: UtcDatetime
-    started_at: UtcDatetime | None
-    completed_at: UtcDatetime | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
     dry_run: bool
     total_assets: int
     processed_count: int
@@ -245,7 +229,7 @@ class AssetOutcomeResponse(BaseModel):
     target_format: str | None
     input_bytes: int
     output_bytes: int
-    updated_at: UtcDatetime
+    updated_at: datetime
 
     @classmethod
     def from_outcome(cls, outcome: AssetOutcomeRow) -> "AssetOutcomeResponse":
