@@ -406,11 +406,8 @@ class TestExportFailures:
         assert "boom" in body
         assert "a1" not in body
 
-    async def test_updated_at_column_has_a_utc_offset(self, client):
-        """CSV export reads AssetOutcome.updated_at straight off the ORM
-        object (not through AssetOutcomeResponse) -- it only gets a UTC
-        offset because TZDateTime makes that true at the column itself,
-        for every reader, not because this route was patched directly."""
+    async def test_updated_at_column_is_iso8601_with_utc_offset(self, client):
+        """Same ISO 8601 shape as the JSON API, so spreadsheets parse it."""
         await _configure_connection(client)
         created = await client.post("/api/runs", json={"asset_types": "IMAGE"})
         run_id = created.json()["id"]
@@ -428,9 +425,12 @@ class TestExportFailures:
             await db.commit()
 
         resp = await client.get(f"/api/runs/{run_id}/export-failures")
-        body = resp.text
-        updated_at_field = body.strip().splitlines()[-1].split(",")[-1]
-        assert "+00:00" in updated_at_field, (
+        assert resp.status_code == 200
+        updated_at_field = resp.text.strip().splitlines()[-1].split(",")[-1]
+        assert "T" in updated_at_field, (
+            f"CSV updated_at={updated_at_field!r} is not ISO 8601"
+        )
+        assert updated_at_field.endswith("+00:00"), (
             f"CSV updated_at={updated_at_field!r} has no UTC offset"
         )
 
