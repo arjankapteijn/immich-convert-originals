@@ -1,13 +1,4 @@
-"""Tests for the TZDateTime column type (see app/models/types.py).
-
-Regression coverage for the offset-less-UTC-timestamp bug: Run/AssetOutcome
-timestamps were always written as datetime.now(timezone.utc), but a plain
-DateTime column on SQLite silently drops the tzinfo on read, so the API
-serialized e.g. "2026-09-23T22:00:01" instead of "...+00:00" -- a browser's
-`new Date(...)` reads that as local time instead of converting it, making a
-run that started at local midnight (CEST, UTC+2) display as if it started
-at 22:00. TZDateTime fixes this at the column level.
-"""
+"""Tests for the TZDateTime column type (see app/models/types.py)."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -56,9 +47,8 @@ class TestTZDateTime:
 
     async def test_non_utc_aware_datetime_is_normalized_to_utc(self, session):
         cest = timezone(timedelta(hours=2))
-        # 2026-09-24 00:00:00 CEST == 2026-09-23 22:00:00 UTC -- this is
-        # exactly the cron-fires-at-local-midnight scenario that surfaced
-        # the original bug.
+        # 2026-09-24 00:00 CEST == 2026-09-23 22:00 UTC, the local-midnight
+        # case that surfaced the original bug.
         local_midnight = datetime(2026, 9, 24, 0, 0, 0, tzinfo=cest)
         row = _Stamped(at=local_midnight)
         session.add(row)

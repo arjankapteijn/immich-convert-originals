@@ -7,6 +7,7 @@ separately in test_run_service.py).
 """
 
 import json
+from datetime import datetime
 
 from app.database import AsyncSessionLocal
 from app.models.asset_outcome import AssetOutcome
@@ -142,30 +143,17 @@ class TestCreateRun:
 
 
 class TestRunTimestampsAreUtcAware:
-    """Regression test for the offset-less UTC timestamp bug.
+    """Regression tests for timestamps serialized without a UTC offset.
 
-    Run.created_at is always written as datetime.now(timezone.utc), but a
-    plain DateTime column drops the tzinfo on read on SQLite -- so without
-    the TZDateTime column type (app/models/types.py), the API returns e.g.
-    "2026-09-23T22:00:01" instead of "...+00:00". A browser's
-    `new Date(...)` treats the former as local time instead of converting
-    it, making a run that started at local midnight (CEST, UTC+2) display
-    as if it started at 22:00.
-
-    datetime.fromisoformat() round-trips exactly what a browser's Date
-    parser cares about: whether an offset is present at all. tzinfo is
-    None for the old, broken shape (plain DateTime column) and
-    datetime.timezone.utc for the fixed one (TZDateTime), so asserting
-    `parsed.tzinfo is not None` fails on the old column type and passes
-    on the new one. See test_types.py for unit tests of TZDateTime
-    itself; these exercise it through the real API round-trip.
+    A plain DateTime column drops tzinfo on read on SQLite, so the API
+    returned e.g. "2026-09-23T22:00:01" instead of "...+00:00" and browsers
+    read it as local time. Without TZDateTime (app/models/types.py),
+    datetime.fromisoformat() yields a naive datetime here.
     """
 
     async def test_created_at_round_trips_through_sqlite_with_a_utc_offset(
         self, client
     ):
-        from datetime import datetime
-
         await _configure_connection(client)
         resp = await client.post(
             "/api/runs", json={"asset_types": "IMAGE", "dry_run": True}
@@ -173,15 +161,10 @@ class TestRunTimestampsAreUtcAware:
         data = resp.json()
 
         parsed = datetime.fromisoformat(data["created_at"])
-        assert parsed.tzinfo is not None, (
-            f"created_at={data['created_at']!r} has no UTC offset -- a "
-            "browser's `new Date(...)` will misread this as local time"
-        )
+        assert parsed.tzinfo is not None, f"created_at={data['created_at']!r}"
         assert parsed.utcoffset().total_seconds() == 0
 
     async def test_asset_outcome_updated_at_has_a_utc_offset(self, client):
-        from datetime import datetime
-
         await _configure_connection(client)
         run_resp = await client.post(
             "/api/runs", json={"asset_ids": ["a1"], "dry_run": False}
@@ -204,9 +187,7 @@ class TestRunTimestampsAreUtcAware:
         assert len(items) == 1
 
         parsed = datetime.fromisoformat(items[0]["updated_at"])
-        assert parsed.tzinfo is not None, (
-            f"updated_at={items[0]['updated_at']!r} has no UTC offset"
-        )
+        assert parsed.tzinfo is not None, f"updated_at={items[0]['updated_at']!r}"
 
 
 class TestListAndGetRuns:
@@ -427,12 +408,8 @@ class TestExportFailures:
         resp = await client.get(f"/api/runs/{run_id}/export-failures")
         assert resp.status_code == 200
         updated_at_field = resp.text.strip().splitlines()[-1].split(",")[-1]
-        assert "T" in updated_at_field, (
-            f"CSV updated_at={updated_at_field!r} is not ISO 8601"
-        )
-        assert updated_at_field.endswith("+00:00"), (
-            f"CSV updated_at={updated_at_field!r} has no UTC offset"
-        )
+        assert "T" in updated_at_field, updated_at_field
+        assert updated_at_field.endswith("+00:00"), updated_at_field
 
     async def test_missing_run_404(self, client):
         resp = await client.get("/api/runs/999999/export-failures")

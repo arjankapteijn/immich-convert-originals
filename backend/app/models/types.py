@@ -7,21 +7,11 @@ from sqlalchemy.types import TypeDecorator
 
 
 class TZDateTime(TypeDecorator):
-    """A DateTime that is always timezone-aware, even on SQLite.
+    """An always-aware UTC DateTime for backends without timestamptz.
 
-    SQLite has no native timestamptz type -- SQLAlchemy's own
-    DateTime(timezone=True) is a no-op on the sqlite dialect, and a plain
-    DateTime column silently drops tzinfo on every read. That previously
-    meant every reader of Run.created_at/started_at/completed_at and
-    AssetOutcome.updated_at (API responses, the CSV export, any future
-    internal comparison against datetime.now(timezone.utc)) got back a
-    naive datetime that was actually UTC without saying so.
-
-    This mirrors SQLAlchemy's documented TZDateTime recipe
-    (https://docs.sqlalchemy.org/en/20/core/custom_types.html): store as
-    naive UTC (what SQLite can actually persist), and always hand back an
-    aware UTC datetime, so tzinfo can never again go missing at any read
-    site without deliberately stripping it.
+    SQLite ignores DateTime(timezone=True) and drops tzinfo on read, so a
+    timestamp written as UTC came back naive and serialized without an
+    offset. Store naive UTC, return aware UTC.
     """
 
     impl = DateTime
